@@ -153,12 +153,44 @@ async function runE2ETests() {
     fs.writeFileSync(activeLinksPath, JSON.stringify(initialTestVideos, null, 2));
 
     const initialHash = crypto.createHash('sha256').update(JSON.stringify(initialTestVideos)).digest('hex').slice(0, 16);
-    fs.writeFileSync(activeStatusPath, JSON.stringify({ _comment: 'test', hash: initialHash }, null, 2));
+    fs.writeFileSync(activeStatusPath, JSON.stringify({ _comment: 'test', hash: initialHash, lastChecked: '2026-11-27T06:00:00.000Z' }, null, 2));
 
     // Open page with configured test endpoints and 250ms polling interval
     const testUrl = `http://127.0.0.1:${PORT}/?statusUrl=/test/fixtures/active-status.json&linksUrl=/test/fixtures/active-links.json&pollInterval=250`;
+    await page.bringToFront();
     await page.goto(testUrl, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.kata-card', { timeout: 5000 });
+
+    // Verify last-checked info icon: hidden on Kata, visible & right-aligned on New, toggles label on click
+    const refreshDisplayKata = await page.$eval('#refreshInfo', el => getComputedStyle(el).display);
+    assert.equal(refreshDisplayKata, 'none', 'Refresh info icon must be hidden on Kata filter');
+
+    await page.click('#btn-NEW');
+    await new Promise(r => setTimeout(r, 150));
+    const refreshDisplayNew = await page.$eval('#refreshInfo', el => getComputedStyle(el).display);
+    assert.equal(refreshDisplayNew, 'flex', 'Refresh info icon must be visible on New filter');
+
+    const refreshTitle = await page.$eval('#refreshInfoBtn', el => el.getAttribute('title') || '');
+    assert.ok(refreshTitle.startsWith('Last checked:'), `Refresh button tooltip must start with "Last checked:", got "${refreshTitle}"`);
+
+    const labelHiddenBeforeClick = await page.$eval('#refreshLabel', el => getComputedStyle(el).display);
+    assert.equal(labelHiddenBeforeClick, 'none', 'Refresh label must be hidden until clicked');
+
+    await page.click('#refreshInfoBtn');
+    const labelVisibleAfterClick = await page.$eval('#refreshLabel', el => getComputedStyle(el).display);
+    assert.notEqual(labelVisibleAfterClick, 'none', 'Refresh label must be visible after clicking info icon');
+
+    const statsRowRight = await page.$eval('.stats-row', el => el.getBoundingClientRect().right);
+    const refreshBtnRight = await page.$eval('#refreshInfoBtn', el => el.getBoundingClientRect().right);
+    assert.ok(
+      Math.abs(statsRowRight - refreshBtnRight) <= 5,
+      `Refresh info button right edge (${refreshBtnRight}) must align with stats row right edge (${statsRowRight})`
+    );
+
+    await page.click('#btn-KATA');
+    await new Promise(r => setTimeout(r, 150));
+    const refreshDisplayBackToKata = await page.$eval('#refreshInfo', el => getComputedStyle(el).display);
+    assert.equal(refreshDisplayBackToKata, 'none', 'Refresh info icon must hide when leaving New filter');
 
     // Initially, "New" button should NOT be active (no videos younger than 2 months)
     const isNewActiveInitially = await page.$eval('#btn-NEW', b => b.classList.contains('is-new-active'));

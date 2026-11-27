@@ -68,7 +68,13 @@
       </div>
     </header>
 
-    <div class="stats" id="statsBar">Loading catalog...</div>
+    <div class="stats-row">
+      <div class="stats" id="statsBar">Loading catalog...</div>
+      <div class="refresh-info" id="refreshInfo" style="display: none;">
+        <span class="refresh-label" id="refreshLabel"></span>
+        <button type="button" class="refresh-info-btn" id="refreshInfoBtn" aria-label="Last catalog refresh time" onclick="toggleRefreshLabel()">ⓘ</button>
+      </div>
+    </div>
 
     <div class="kata-list" id="kataGrid">
       <!-- Dynamically populated by app.js -->

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { matchKatas, parseStripe, renderCardHtml, escapeHtml } = require('../app.js');
+const { matchKatas, parseStripe, renderCardHtml, escapeHtml, formatLastChecked } = require('../app.js');
 
 const kataMap = JSON.parse(fs.readFileSync(path.join(__dirname, '../kata_map.json'), 'utf8'));
 
@@ -173,6 +173,14 @@ describe('Unit Test Suite: Kyokushin Kata Library', () => {
       const mutated = [{ id: '1', title: 'Kata 1 (fixed)' }, { id: '2', title: 'Kata 2' }];
       const hashMutated = crypto.createHash('sha256').update(JSON.stringify(mutated)).digest('hex').slice(0, 16);
       assert.notEqual(hash1, hashMutated);
+    });
+
+    it('formats valid lastChecked ISO timestamps and returns empty string for invalid/missing values', () => {
+      const formatted = formatLastChecked('2026-11-27T06:00:00.000Z');
+      assert.ok(formatted.includes('2026'), `Formatted timestamp should include year, got: "${formatted}"`);
+      assert.equal(formatLastChecked(''), '');
+      assert.equal(formatLastChecked(null), '');
+      assert.equal(formatLastChecked('not-a-date'), '');
     });
   });
 
