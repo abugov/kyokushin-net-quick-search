@@ -1,6 +1,7 @@
 
 let KATA_MAP = [];
 let CATALOG_HASH = '';
+let LAST_CHECKED = '';
 let isCatalogOutdated = false;
 let allCards = [];
 let totalVideosCount = 0;
@@ -26,6 +27,42 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function formatLastChecked(isoString) {
+  if (!isoString) return '';
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
+function updateRefreshInfo() {
+  const container = document.getElementById('refreshInfo');
+  const label = document.getElementById('refreshLabel');
+  const btn = document.getElementById('refreshInfoBtn');
+  if (!container || !label || !btn) return;
+
+  const formatted = formatLastChecked(LAST_CHECKED);
+  if (currentCategory === 'NEW' && formatted) {
+    const text = `Last checked: ${formatted}`;
+    label.innerText = text;
+    btn.title = text;
+    container.style.display = 'inline-flex';
+  } else {
+    container.style.display = 'none';
+    container.classList.remove('is-open');
+  }
+}
+
+function toggleRefreshLabel() {
+  const container = document.getElementById('refreshInfo');
+  if (container) container.classList.toggle('is-open');
 }
 
 function parseStripe(stripeValue) {
@@ -347,6 +384,7 @@ function filterKata() {
   if (statsBar) {
     statsBar.innerText = 'Showing ' + count + ' ' + (labelMap[currentCategory] || 'videos') + ' out of ' + totalVideosCount;
   }
+  updateRefreshInfo();
 }
 
 // Background beacon check: checks status file periodically.
@@ -357,6 +395,10 @@ function checkScrapeStatus() {
   fetch(statusUrl + (statusUrl.includes('?') ? '&' : '?') + 't=' + Date.now())
     .then(res => res.json())
     .then(async data => {
+      if (data && data.lastChecked && data.lastChecked !== LAST_CHECKED) {
+        LAST_CHECKED = data.lastChecked;
+        updateRefreshInfo();
+      }
       if (data && data.hash && data.hash !== CATALOG_HASH) {
         if (data.hash === inspectedCatalogHash) return; // already inspected this catalog version
         inspectedCatalogHash = data.hash;
@@ -402,6 +444,7 @@ async function initApp() {
 
     KATA_MAP = kataMapRes;
     CATALOG_HASH = (statusRes && statusRes.hash) || '';
+    LAST_CHECKED = (statusRes && statusRes.lastChecked) || '';
     inspectedCatalogHash = CATALOG_HASH;
     totalVideosCount = Array.isArray(videosRes) ? videosRes.length : 0;
 
@@ -480,6 +523,7 @@ if (typeof window !== 'undefined') {
   window.setBeltFilter = setBeltFilter;
   window.filterKata = filterKata;
   window.checkScrapeStatus = checkScrapeStatus;
+  window.toggleRefreshLabel = toggleRefreshLabel;
 }
 
 if (typeof document !== 'undefined') {
@@ -491,6 +535,7 @@ if (typeof module !== 'undefined' && module.exports) {
     matchKatas,
     parseStripe,
     escapeHtml,
+    formatLastChecked,
     renderCardHtml
   };
 }

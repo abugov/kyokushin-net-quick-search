@@ -51,13 +51,10 @@ jobs:
             git push
           fi
 
-  # Job 2: Build and Deploy to GitHub Pages
-  deploy:
+  # Job 2: Build and upload GitHub Pages artifact (separate from deploy to avoid artifact indexing race)
+  build:
     needs: [scrape]
     if: always() && (needs.scrape.result == 'success' || needs.scrape.result == 'skipped')
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -68,11 +65,28 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      - name: Stamp lastChecked timestamp for Pages artifact
+        run: |
+          node -e '
+            const fs = require("fs");
+            const status = JSON.parse(fs.readFileSync("./scrape-status.json", "utf8"));
+            status.lastChecked = new Date().toISOString();
+            fs.writeFileSync("./scrape-status.json", JSON.stringify(status, null, 2) + "\n");
+          '
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
 
+  # Job 3: Deploy to GitHub Pages
+  deploy:
+    needs: [build]
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
